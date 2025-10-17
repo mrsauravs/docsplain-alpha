@@ -14,14 +14,20 @@ def show_main_application():
     This is a special debug version to find the source of the blank screen.
     """
     
-    # --- START OF DEBUG BLOCK ---
+    # --- START OF SAFER DEBUG BLOCK ---
     st.title("DEBUG MODE: Main Application")
     st.write("---")
     st.write("Step 1: Entered the `show_main_application` function.")
 
     user_obj = st.session_state.get("user")
-    st.write("Step 2: Retrieved user object from session state. Contents:")
-    st.json(user_obj, expanded=False)
+    
+    # This block safely prints the user object to avoid silent crashes from st.json()
+    st.write("Step 2: Safely inspecting user object from session state:")
+    if isinstance(user_obj, dict):
+        for key, value in user_obj.items():
+            st.write(f"- Key: `{key}`, Value: `{str(value)}`, Type: `{type(value)}`")
+    else:
+        st.write(f"- User object is not a dictionary. Type: `{type(user_obj)}`")
 
     if not isinstance(user_obj, dict) or "name" not in user_obj:
         st.error("Validation Failed: The user object in the session is not a valid dictionary or is missing required keys.")
@@ -55,7 +61,7 @@ def show_main_application():
     st.write("---")
     st.success("DEBUG: Core components loaded successfully. Proceeding with main UI.")
     st.write("---")
-    # --- END OF DEBUG BLOCK ---
+    # --- END OF SAFER DEBUG BLOCK ---
 
     # Original application logic starts here
     if not kb:
@@ -118,3 +124,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
