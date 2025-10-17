@@ -1,30 +1,43 @@
 import streamlit as st
-import database as db
 import requests
 import json
 from jose import jwt
 import urllib.parse
 
-def get_auth0_auth_url():
-    """Constructs the authorization URL to redirect the user to Auth0."""
-    domain = st.secrets["AUTH0_DOMAIN"]
-    client_id = st.secrets["AUTH0_CLIENT_ID"]
-    redirect_uri = "https://docsplain-alpha.streamlit.app"
-    
-    params = {
-        "response_type": "code",
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "scope": "openid profile email",
-        "audience": f"https://{domain}/api/v2/",  # Request an audience for user management
-        "prompt": "login" # Ensures login prompt is always shown
-    }
-    
-    auth_url = f"https://{domain}/authorize?{urllib.parse.urlencode(params)}"
-    return auth_url
+def show_login_button():
+    """Displays the login button and handles the redirect logic."""
+    if st.session_state.get("do_auth_redirect", False):
+        del st.session_state.do_auth_redirect
+        
+        domain = st.secrets["AUTH0_DOMAIN"]
+        client_id = st.secrets["AUTH0_CLIENT_ID"]
+        redirect_uri = "https://docsplain-alpha.streamlit.app"
+        
+        params = {
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "openid profile email"
+        }
+        auth_url = f"https://{domain}/authorize?{urllib.parse.urlencode(params)}"
+        js_redirect = f'<script>window.top.location.href = "{auth_url}"</script>'
+        st.html(js_redirect)
+        st.stop()
 
-def get_token_from_code(auth_code):
-    """Exchanges the authorization code for an access token and user info."""
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Okta.svg/2560px-Okta.svg.png", width=100)
+    st.subheader("Welcome to Docsplain")
+    st.info("Please sign in or create an account to continue.")
+    if st.button("Login / Sign Up", use_container_width=True, type="primary"):
+        st.session_state.do_auth_redirect = True
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def process_auth_code(auth_code):
+    """
+    Exchanges the authorization code from Auth0 for a user token.
+    Returns: A dictionary with user info upon success, None otherwise.
+    """
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     client_secret = st.secrets["AUTH0_CLIENT_SECRET"]
@@ -64,22 +77,4 @@ def get_token_from_code(auth_code):
         st.error(f"Error exchanging authorization code: {e}")
         st.error(f"Response from server: {e.response.text if e.response else 'No response'}")
     return None
-
-def show_login_button():
-    """Displays the login button and handles the redirect logic."""
-    if st.session_state.get("do_auth_redirect", False):
-        del st.session_state.do_auth_redirect
-        auth_url = get_auth0_auth_url()
-        js_redirect = f'<script>window.top.location.href = "{auth_url}"</script>'
-        st.html(js_redirect)
-        st.stop()
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Okta.svg/2560px-Okta.svg.png", width=100)
-    st.subheader("Welcome to Docsplain")
-    st.info("Please sign in or create an account to continue.")
-    if st.button("Login / Sign Up", use_container_width=True, type="primary"):
-        st.session_state.do_auth_redirect = True
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
