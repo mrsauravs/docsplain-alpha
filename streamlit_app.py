@@ -10,66 +10,76 @@ from auth import show_auth_flow
 
 def show_main_application():
     """Renders the main application UI after the user has logged in."""
-    st.sidebar.header(f"Welcome, {st.session_state.user['name']}!")
-    st.sidebar.write(f"Organization: **{st.session_state.user['org_name']}**")
     
-    if st.sidebar.button("Logout"):
-        st.session_state.user = None
-        st.rerun()
-
-    # Onboarding: Check if a knowledge base exists for this organization
-    kb = db.get_kb_for_organization(st.session_state.user['org_id'])
-    if not kb:
-        st.warning("Your organization's Knowledge Base is not set up yet.")
-        st.info("Please complete the wizard below to configure the AI for your team.")
-        show_kb_wizard(st.session_state.user['org_id'])
-    else:
-        # Main application router
-        st.title("Docsplain Assistant")
+    # --- MODIFICATION: Added targeted error handling inside the function ---
+    # This will catch errors that might not be caught by the main try...except block.
+    try:
+        st.sidebar.header(f"Welcome, {st.session_state.user['name']}!")
+        st.sidebar.write(f"Organization: **{st.session_state.user['org_name']}**")
         
-        # In the Alpha phase, we only show the Release Notes workflow (manual)
-        st.header("Generate Release Notes")
-        st.markdown("This tool uses your organization's configured Knowledge Base and your uploaded CSV files to generate professional release notes.")
-        
-        # --- Manual CSV Upload Workflow ---
-        uploaded_files = {}
-        uploaded_files['epics'] = st.file_uploader("Upload Epics CSV", type="csv")
-        uploaded_files['stories'] = st.file_uploader("Upload Stories CSV", type="csv")
-        uploaded_files['fixes'] = st.file_uploader("Upload Bug Fixes CSV", type="csv")
-        
-        if st.button("Generate Release Notes", type="primary", use_container_width=True):
-            if any(uploaded_files.values()):
-                with st.spinner("Analyzing data and generating notes..."):
-                    csv_data = {key: parse_csv(file) for key, file in uploaded_files.items() if file}
-                    
-                    prompt = "Generate release notes from the following CSV data..." # Placeholder prompt
-                    full_prompt = f"{prompt}\n\nKnowledge Base:\n{kb}\n\nCSV Data:\n{json.dumps(csv_data, indent=2)}"
+        if st.sidebar.button("Logout"):
+            st.session_state.user = None
+            st.rerun()
 
-                    release_notes_md = call_ai(full_prompt)
-                    st.session_state.generated_notes = release_notes_md
-            else:
-                st.warning("Please upload at least one CSV file.")
-
-        if "generated_notes" in st.session_state and st.session_state.generated_notes:
-            st.subheader("Generated Release Notes")
-            st.markdown("---")
+        # Onboarding: Check if a knowledge base exists for this organization
+        st.info("Checking for your organization's Knowledge Base...")
+        kb = db.get_kb_for_organization(st.session_state.user['org_id'])
+        
+        if not kb:
+            st.warning("Your organization's Knowledge Base is not set up yet.")
+            st.info("Please complete the wizard below to configure the AI for your team.")
+            show_kb_wizard(st.session_state.user['org_id'])
+        else:
+            # Main application router
+            st.title("Docsplain Assistant")
             
-            docx_bytes = generate_docx(st.session_state.generated_notes)
-            st.download_button(
-                label="Download Release Notes (.docx)",
-                data=docx_bytes,
-                file_name="release_notes.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
+            # In the Alpha phase, we only show the Release Notes workflow (manual)
+            st.header("Generate Release Notes")
+            st.markdown("This tool uses your organization's configured Knowledge Base and your uploaded CSV files to generate professional release notes.")
+            
+            # --- Manual CSV Upload Workflow ---
+            uploaded_files = {}
+            uploaded_files['epics'] = st.file_uploader("Upload Epics CSV", type="csv")
+            uploaded_files['stories'] = st.file_uploader("Upload Stories CSV", type="csv")
+            uploaded_files['fixes'] = st.file_uploader("Upload Bug Fixes CSV", type="csv")
+            
+            if st.button("Generate Release Notes", type="primary", use_container_width=True):
+                if any(uploaded_files.values()):
+                    with st.spinner("Analyzing data and generating notes..."):
+                        csv_data = {key: parse_csv(file) for key, file in uploaded_files.items() if file}
+                        
+                        prompt = "Generate release notes from the following CSV data..." # Placeholder prompt
+                        full_prompt = f"{prompt}\n\nKnowledge Base:\n{kb}\n\nCSV Data:\n{json.dumps(csv_data, indent=2)}"
+
+                        release_notes_md = call_ai(full_prompt)
+                        st.session_state.generated_notes = release_notes_md
+                else:
+                    st.warning("Please upload at least one CSV file.")
+
+            if "generated_notes" in st.session_state and st.session_state.generated_notes:
+                st.subheader("Generated Release Notes")
+                st.markdown("---")
+                
+                docx_bytes = generate_docx(st.session_state.generated_notes)
+                st.download_button(
+                    label="Download Release Notes (.docx)",
+                    data=docx_bytes,
+                    file_name="release_notes.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
+                )
+
+    except Exception as e:
+        st.error("An error occurred while loading the main application. Please see details below.")
+        st.exception(e)
+    # --- END MODIFICATION ---
+
 
 def main():
     """The main application entry point."""
     st.set_page_config(page_title="Docsplain", layout="wide")
     load_local_css("style.css")
 
-    # --- MODIFICATION: Added robust error handling ---
-    # This try...except block will catch any hidden errors and display them.
     try:
         # Initialize database connection and tables
         db.setup_database()
@@ -81,9 +91,9 @@ def main():
             show_main_application()
 
     except Exception as e:
-        st.error("An unexpected error occurred. Please see the details below.")
+        st.error("An unexpected error occurred at the application root. Please see the details below.")
         st.exception(e)
-    # --- END MODIFICATION ---
+
 
 if __name__ == "__main__":
     main()
