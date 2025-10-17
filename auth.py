@@ -9,7 +9,7 @@ def get_auth0_auth_url():
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     # This must be the EXACT URL you configured in your Auth0 application settings
-    redirect_uri = "https://docsplain-alpha.streamlit.app"
+    redirect_uri = "https://docsplain-alpha. streamlit.app"
     
     url = (
         f"https://{domain}/authorize"
@@ -88,22 +88,12 @@ def show_auth_flow():
         auth_url = get_auth0_auth_url()
         
         # --- MODIFICATION ---
-        # Replaced the non-standard <a><button></a> structure with a single <a> tag
-        # styled to look like a button. This is the correct, reliable way to create a clickable link.
-        button_style = """
-            display: inline-block;
-            padding: 0.75rem 1.5rem;
-            background-color: #4F46E5;
-            color: white;
-            text-align: center;
-            text-decoration: none;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            width: 100%;
-            box-sizing: border-box;
-            border: none;
-        """
-        st.markdown(f'<a href="{auth_url}" target="_top" style="{button_style}">Login / Sign Up</a>', unsafe_allow_html=True)
+        # Replaced the markdown link with a standard Streamlit button.
+        # When clicked, it will execute a small piece of JavaScript to redirect the
+        # top-level browser window, reliably breaking out of the iframe.
+        if st.button("Login / Sign Up", use_container_width=True, type="primary"):
+            js_redirect = f'<script>window.top.location.href = "{auth_url}"</script>'
+            st.html(js_redirect)
         # --- END MODIFICATION ---
 
     else:
