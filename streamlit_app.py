@@ -28,7 +28,6 @@ def show_main_application():
         st.title("Docsplain Assistant")
         
         # In the Alpha phase, we only show the Release Notes workflow (manual)
-        # We will add the router for the Doc Plan workflow in a later phase.
         st.header("Generate Release Notes")
         st.markdown("This tool uses your organization's configured Knowledge Base and your uploaded CSV files to generate professional release notes.")
         
@@ -43,11 +42,7 @@ def show_main_application():
                 with st.spinner("Analyzing data and generating notes..."):
                     csv_data = {key: parse_csv(file) for key, file in uploaded_files.items() if file}
                     
-                    # For Alpha, we're not using RAG or advanced context yet.
-                    # We will build on this in the Beta phase.
                     prompt = "Generate release notes from the following CSV data..." # Placeholder prompt
-                    
-                    # For simplicity in Alpha, we'll combine the CSV data into the prompt
                     full_prompt = f"{prompt}\n\nKnowledge Base:\n{kb}\n\nCSV Data:\n{json.dumps(csv_data, indent=2)}"
 
                     release_notes_md = call_ai(full_prompt)
@@ -67,28 +62,28 @@ def show_main_application():
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True
             )
-            
-            # We can add a preview if desired later.
-            # with st.expander("Preview"):
-            #    st.markdown(st.session_state.generated_notes)
-
 
 def main():
     """The main application entry point."""
     st.set_page_config(page_title="Docsplain", layout="wide")
     load_local_css("style.css")
 
-    # Initialize database connection and tables
-    # --- FIX: Changed db.init_db() to the correct function name db.setup_database() ---
-    db.setup_database()
+    # --- MODIFICATION: Added robust error handling ---
+    # This try...except block will catch any hidden errors and display them.
+    try:
+        # Initialize database connection and tables
+        db.setup_database()
 
-    # The main app now just checks if a user exists in the session.
-    # The auth_flow module is responsible for setting this state.
-    if "user" not in st.session_state or st.session_state.user is None:
-        show_auth_flow()
-    else:
-        show_main_application()
+        # Main application logic
+        if "user" not in st.session_state or st.session_state.user is None:
+            show_auth_flow()
+        else:
+            show_main_application()
+
+    except Exception as e:
+        st.error("An unexpected error occurred. Please see the details below.")
+        st.exception(e)
+    # --- END MODIFICATION ---
 
 if __name__ == "__main__":
     main()
-
