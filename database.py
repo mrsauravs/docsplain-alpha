@@ -64,38 +64,52 @@ def get_user_by_email(email):
                     columns = [desc[0] for desc in cur.description]
                     db_dict = dict(zip(columns, user_data))
 
-                    # --- FIX: Manually sanitize the dictionary to ensure serializable types ---
                     sanitized_user = {
                         "id": int(db_dict["id"]),
                         "org_id": int(db_dict["org_id"]),
-                        "name": str(db_dict["name"]),
-                        "email": str(db_dict["email"]),
-                        "picture_url": str(db_dict["picture_url"]),
-                        "org_name": str(db_dict["org_name"])
+                        "name": str(db_dict.get("name") or ""),
+                        "email": str(db_dict.get("email") or ""),
+                        "picture_url": str(db_dict.get("picture_url") or ""),
+                        "org_name": str(db_dict.get("org_name") or "")
                     }
                     return sanitized_user
-                    # --- END FIX ---
         finally:
             conn.close()
     return None
 
 def create_user_and_organization(user_info, org_name):
-    """Creates a new organization and a new user in the database."""
+    """Creates a new organization and a new user, then returns the new user's sanitized data."""
     conn = get_db_connection()
     if conn:
         try:
             with conn.cursor() as cur:
+                # --- FIX: Rewritten to be atomic and avoid race conditions ---
+                # 1. Create the organization and get its ID
                 cur.execute("INSERT INTO organizations (name) VALUES (%s) RETURNING id;", (org_name,))
                 org_id = cur.fetchone()[0]
 
+                # 2. Create the user and get their ID
                 cur.execute("""
                     INSERT INTO users (org_id, name, email, picture_url)
-                    VALUES (%s, %s, %s, %s);
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id;
                 """, (org_id, user_info.get('name'), user_info.get('email'), user_info.get('picture')))
+                user_id = cur.fetchone()[0]
                 
                 conn.commit()
-                # After creating, fetch the sanitized user object
-                return get_user_by_email(user_info.get('email'))
+
+                # 3. Construct and return a sanitized user object directly
+                # This avoids a second database call and prevents the race condition.
+                new_user = {
+                    "id": int(user_id),
+                    "org_id": int(org_id),
+                    "name": str(user_info.get("name") or ""),
+                    "email": str(user_info.get("email") or ""),
+                    "picture_url": str(user_info.get("picture") or ""),
+                    "org_name": str(org_name or "")
+                }
+                return new_user
+                # --- END FIX ---
 
         except psycopg2.Error as e:
             st.error(f"Error during user registration: {e}")
@@ -134,4 +148,3 @@ def get_kb_for_organization(org_id):
         finally:
             conn.close()
     return None
-
