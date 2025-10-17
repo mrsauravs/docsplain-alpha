@@ -3,6 +3,6 @@ pandas
 google-generativeai
 python-docx
 requests
-streamlit-oauth
-auth0-python
 psycopg2-binary
+PyJWT
+python-jose
