@@ -15,7 +15,9 @@ def get_auth0_auth_url():
         "response_type": "code",
         "client_id": client_id,
         "redirect_uri": redirect_uri,
-        "scope": "openid profile email"
+        "scope": "openid profile email",
+        "audience": f"https://{domain}/api/v2/",  # Request an audience for user management
+        "prompt": "login" # Ensures login prompt is always shown
     }
     
     auth_url = f"https://{domain}/authorize?{urllib.parse.urlencode(params)}"
@@ -63,14 +65,8 @@ def get_token_from_code(auth_code):
         st.error(f"Response from server: {e.response.text if e.response else 'No response'}")
     return None
 
-def handle_auth():
-    """
-    Manages the authentication process. It shows a login button, handles the redirect,
-    and returns user information upon successful authentication.
-    Returns:
-        - A dict with user info if logged in.
-        - None if not logged in.
-    """
+def show_login_button():
+    """Displays the login button and handles the redirect logic."""
     if st.session_state.get("do_auth_redirect", False):
         del st.session_state.do_auth_redirect
         auth_url = get_auth0_auth_url()
@@ -78,20 +74,6 @@ def handle_auth():
         st.html(js_redirect)
         st.stop()
 
-    query_params = st.query_params
-    auth_code = query_params.get("code")
-
-    if auth_code:
-        user_info = get_token_from_code(auth_code)
-        st.query_params.clear()
-        if user_info:
-            # Check if user exists in our database
-            local_user = db.get_user_by_email(user_info['email'])
-            if local_user:
-                return local_user # Return existing user from DB
-            return user_info # Return new user info from Auth0
-    
-    # Display login button if not authenticated
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Okta.svg/2560px-Okta.svg.png", width=100)
     st.subheader("Welcome to Docsplain")
@@ -100,6 +82,4 @@ def handle_auth():
         st.session_state.do_auth_redirect = True
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    return None
 
