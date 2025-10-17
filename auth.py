@@ -25,7 +25,7 @@ def get_token_from_code(auth_code):
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     client_secret = st.secrets["AUTH0_CLIENT_SECRET"]
-    redirect_uri = "https://docsplain-alpha.streamlit.app"
+    redirect_uri = "https.docsplain-alpha.streamlit.app"
 
     token_url = f"https://{domain}/oauth/token"
     payload = {
@@ -86,7 +86,8 @@ def show_auth_flow():
     if not auth_code:
         st.info("Please sign in or create an account to continue.")
         auth_url = get_auth0_auth_url()
-        st.markdown(f'<a href="{auth_url}" target="_self" class="button-link"><button style="width: 100%; border-radius: 0.5rem; padding: 0.75rem 1.5rem; font-weight: 600;">Login / Sign Up</button></a>', unsafe_allow_html=True)
+        # MODIFICATION: Added target="_top" to break out of the iframe
+        st.markdown(f'<a href="{auth_url}" target="_top" class="button-link"><button style="width: 100%; border-radius: 0.5rem; padding: 0.75rem 1.5rem; font-weight: 600;">Login / Sign Up</button></a>', unsafe_allow_html=True)
     else:
         with st.spinner("Authenticating..."):
             user_info = get_token_from_code(auth_code)
@@ -112,4 +113,3 @@ def show_auth_flow():
 
     st.markdown('</div>', unsafe_allow_html=True)
     return None
-
