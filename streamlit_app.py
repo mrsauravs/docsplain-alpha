@@ -10,10 +10,20 @@ from auth import show_auth_flow
 
 def show_main_application():
     """Renders the main application UI after the user has logged in."""
-    
-    # --- MODIFICATION: Added targeted error handling inside the function ---
-    # This will catch errors that might not be caught by the main try...except block.
+
+    # --- FIX: Add robust validation for the user object ---
+    # This prevents errors if the user object is not a valid dictionary.
+    if not isinstance(st.session_state.get("user"), dict) or "name" not in st.session_state.user:
+        st.error("User session is invalid. Please try logging in again.")
+        # Provide a way to reset the state
+        if st.button("Return to Login"):
+            st.session_state.user = None
+            st.rerun()
+        return
+    # --- END FIX ---
+
     try:
+        # Now it's safe to render the sidebar
         st.sidebar.header(f"Welcome, {st.session_state.user['name']}!")
         st.sidebar.write(f"Organization: **{st.session_state.user['org_name']}**")
         
@@ -22,7 +32,6 @@ def show_main_application():
             st.rerun()
 
         # Onboarding: Check if a knowledge base exists for this organization
-        st.info("Checking for your organization's Knowledge Base...")
         kb = db.get_kb_for_organization(st.session_state.user['org_id'])
         
         if not kb:
@@ -33,11 +42,9 @@ def show_main_application():
             # Main application router
             st.title("Docsplain Assistant")
             
-            # In the Alpha phase, we only show the Release Notes workflow (manual)
             st.header("Generate Release Notes")
             st.markdown("This tool uses your organization's configured Knowledge Base and your uploaded CSV files to generate professional release notes.")
             
-            # --- Manual CSV Upload Workflow ---
             uploaded_files = {}
             uploaded_files['epics'] = st.file_uploader("Upload Epics CSV", type="csv")
             uploaded_files['stories'] = st.file_uploader("Upload Stories CSV", type="csv")
@@ -48,8 +55,8 @@ def show_main_application():
                     with st.spinner("Analyzing data and generating notes..."):
                         csv_data = {key: parse_csv(file) for key, file in uploaded_files.items() if file}
                         
-                        prompt = "Generate release notes from the following CSV data..." # Placeholder prompt
-                        full_prompt = f"{prompt}\n\nKnowledge Base:\n{kb}\n\nCSV Data:\n{json.dumps(csv_data, indent=2)}"
+                        prompt = "Generate release notes from the following CSV data..."
+                        full_prompt = f"{prompt}\n\nKnowledge Base:\n{json.dumps(kb, indent=2)}\n\nCSV Data:\n{json.dumps(csv_data, indent=2)}"
 
                         release_notes_md = call_ai(full_prompt)
                         st.session_state.generated_notes = release_notes_md
@@ -72,7 +79,6 @@ def show_main_application():
     except Exception as e:
         st.error("An error occurred while loading the main application. Please see details below.")
         st.exception(e)
-    # --- END MODIFICATION ---
 
 
 def main():
