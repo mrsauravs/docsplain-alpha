@@ -25,7 +25,6 @@ def get_token_from_code(auth_code):
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     client_secret = st.secrets["AUTH0_CLIENT_SECRET"]
-    # TYPO FIX: Corrected the redirect_uri to include "://"
     redirect_uri = "https://docsplain-alpha.streamlit.app"
 
     token_url = f"https://{domain}/oauth/token"
@@ -87,8 +86,26 @@ def show_auth_flow():
     if not auth_code:
         st.info("Please sign in or create an account to continue.")
         auth_url = get_auth0_auth_url()
-        # Ensure target="_top" is present to break out of the Streamlit iframe
-        st.markdown(f'<a href="{auth_url}" target="_top" class="button-link"><button style="width: 100%; border-radius: 0.5rem; padding: 0.75rem 1.5rem; font-weight: 600;">Login / Sign Up</button></a>', unsafe_allow_html=True)
+        
+        # --- MODIFICATION ---
+        # Replaced the non-standard <a><button></a> structure with a single <a> tag
+        # styled to look like a button. This is the correct, reliable way to create a clickable link.
+        button_style = """
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: #4F46E5;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            width: 100%;
+            box-sizing: border-box;
+            border: none;
+        """
+        st.markdown(f'<a href="{auth_url}" target="_top" style="{button_style}">Login / Sign Up</a>', unsafe_allow_html=True)
+        # --- END MODIFICATION ---
+
     else:
         with st.spinner("Authenticating..."):
             user_info = get_token_from_code(auth_code)
