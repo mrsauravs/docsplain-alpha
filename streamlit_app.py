@@ -2,6 +2,22 @@ import streamlit as st
 import pandas as pd
 import json
 
+# --- TEMPORARY DEBUG BLOCK: REMOVE AFTER FIXING ---
+with st.expander("Secrets Verification Log", expanded=True):
+    required_secrets = [
+        "GEMINI_API_KEY",
+        "AUTH0_CLIENT_ID",
+        "AUTH0_CLIENT_SECRET",
+        "AUTH0_DOMAIN",
+        "DATABASE_URL"
+    ]
+    for secret in required_secrets:
+        if st.secrets.has_key(secret):
+            st.success(f"✅ Found secret: {secret}")
+        else:
+            st.error(f"❌ MISSING secret: {secret}")
+# --- END OF DEBUG BLOCK ---
+
 # Import modular components and utilities
 import database as db
 from utils import load_local_css, parse_csv, call_ai, generate_docx
@@ -112,4 +128,5 @@ if st.session_state.workflow == 'kb_wizard':
 elif st.session_state.workflow == 'selection':
     show_main_selection_screen()
 elif st.session_state.workflow == 'release_notes':
+
     show_release_notes_workflow_alpha()
