@@ -8,8 +8,8 @@ def get_auth0_auth_url():
     """Constructs the authorization URL to redirect the user to Auth0."""
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
-    # This must be the EXACT URL you configured in your Auth0 application settings
-    redirect_uri = "https://docsplain-alpha. streamlit.app"
+    # TYPO FIX: Removed the space from " streamlit.app"
+    redirect_uri = "https://docsplain-alpha.streamlit.app"
     
     url = (
         f"https://{domain}/authorize"
@@ -25,6 +25,7 @@ def get_token_from_code(auth_code):
     domain = st.secrets["AUTH0_DOMAIN"]
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     client_secret = st.secrets["AUTH0_CLIENT_SECRET"]
+    # TYPO FIX: Removed the space from " streamlit.app"
     redirect_uri = "https://docsplain-alpha.streamlit.app"
 
     token_url = f"https://{domain}/oauth/token"
@@ -39,39 +40,27 @@ def get_token_from_code(auth_code):
     
     try:
         response = requests.post(token_url, json=payload, headers=headers)
-        response.raise_for_status()  # Will raise an exception for HTTP error codes
+        response.raise_for_status()
         token_data = response.json()
         
-        # Decode the ID token to get user profile information
         id_token = token_data.get('id_token')
         if id_token:
-            # We need to get the signing key from Auth0 to verify the token
             jwks_url = f"https://{domain}/.well-known/jwks.json"
             jwks = requests.get(jwks_url).json()
             unverified_header = jwt.get_unverified_header(id_token)
             rsa_key = {}
             for key in jwks["keys"]:
                 if key["kid"] == unverified_header["kid"]:
-                    rsa_key = {
-                        "kty": key["kty"],
-                        "kid": key["kid"],
-                        "use": key["use"],
-                        "n": key["n"],
-                        "e": key["e"]
-                    }
+                    rsa_key = { "kty": key["kty"], "kid": key["kid"], "use": key["use"], "n": key["n"], "e": key["e"] }
             if rsa_key:
                 user_info = jwt.decode(
-                    id_token,
-                    rsa_key,
-                    algorithms=["RS256"],
-                    audience=client_id,
-                    issuer=f"https://{domain}/"
+                    id_token, rsa_key, algorithms=["RS256"],
+                    audience=client_id, issuer=f"https://{domain}/"
                 )
                 return user_info
     except requests.exceptions.RequestException as e:
         st.error(f"Error exchanging authorization code: {e}")
         st.error(f"Response from server: {e.response.text if e.response else 'No response'}")
-
     return None
 
 def show_auth_flow():
@@ -80,20 +69,27 @@ def show_auth_flow():
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Okta.svg/2560px-Okta.svg.png", width=100)
     st.subheader("Welcome to Docsplain")
 
+    # --- MODIFICATION: STATE-BASED REDIRECT ---
+    # This block checks if the redirect flag was set on the previous run.
+    if st.session_state.get("do_auth_redirect", False):
+        del st.session_state.do_auth_redirect  # Unset the flag
+        auth_url = get_auth0_auth_url()
+        js_redirect = f'<script>window.top.location.href = "{auth_url}"</script>'
+        st.html(js_redirect)
+        st.stop() # Stop the rest of the app from rendering
+    # --- END MODIFICATION ---
+
     query_params = st.query_params
     auth_code = query_params.get("code")
 
     if not auth_code:
         st.info("Please sign in or create an account to continue.")
-        auth_url = get_auth0_auth_url()
         
-        # --- MODIFICATION ---
-        # Replaced the markdown link with a standard Streamlit button.
-        # When clicked, it will execute a small piece of JavaScript to redirect the
-        # top-level browser window, reliably breaking out of the iframe.
+        # --- MODIFICATION: SET STATE ON CLICK ---
+        # This button now only sets a state variable and triggers a rerun.
         if st.button("Login / Sign Up", use_container_width=True, type="primary"):
-            js_redirect = f'<script>window.top.location.href = "{auth_url}"</script>'
-            st.html(js_redirect)
+            st.session_state.do_auth_redirect = True
+            st.rerun()
         # --- END MODIFICATION ---
 
     else:
