@@ -3,6 +3,7 @@ import database as db
 import requests
 import json
 from jose import jwt
+import urllib.parse
 
 def get_auth0_auth_url():
     """Constructs the authorization URL to redirect the user to Auth0."""
@@ -10,14 +11,15 @@ def get_auth0_auth_url():
     client_id = st.secrets["AUTH0_CLIENT_ID"]
     redirect_uri = "https://docsplain-alpha.streamlit.app"
     
-    url = (
-        f"https://{domain}/authorize"
-        f"?response_type=code"
-        f"&client_id={client_id}"
-        f"&redirect_uri={redirect_uri}"
-        f"&scope=openid%20profile%20email"
-    )
-    return url
+    params = {
+        "response_type": "code",
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "scope": "openid profile email"
+    }
+    
+    auth_url = f"https://{domain}/authorize?{urllib.parse.urlencode(params)}"
+    return auth_url
 
 def get_token_from_code(auth_code):
     """Exchanges the authorization code for an access token and user info."""
@@ -61,9 +63,14 @@ def get_token_from_code(auth_code):
         st.error(f"Response from server: {e.response.text if e.response else 'No response'}")
     return None
 
-def show_auth_flow():
-    """Handles the full user authentication and registration flow using Auth0."""
-    # This block handles the redirect logic. It should be at the very top.
+def handle_auth():
+    """
+    Manages the authentication process. It shows a login button, handles the redirect,
+    and returns user information upon successful authentication.
+    Returns:
+        - A dict with user info if logged in.
+        - None if not logged in.
+    """
     if st.session_state.get("do_auth_redirect", False):
         del st.session_state.do_auth_redirect
         auth_url = get_auth0_auth_url()
@@ -71,46 +78,28 @@ def show_auth_flow():
         st.html(js_redirect)
         st.stop()
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Okta.svg/2560px-Okta.svg.png", width=100)
-    st.subheader("Welcome to Docsplain")
-
     query_params = st.query_params
     auth_code = query_params.get("code")
 
-    if not auth_code:
-        st.info("Please sign in or create an account to continue.")
-        if st.button("Login / Sign Up", use_container_width=True, type="primary"):
-            st.session_state.do_auth_redirect = True
-            st.rerun()
-
-    else:
-        with st.spinner("Authenticating..."):
-            user_info = get_token_from_code(auth_code)
-            st.query_params.clear()
-
-            if user_info:
-                local_user = db.get_user_by_email(user_info['email'])
-                
-                if local_user:
-                    # --- MODIFICATION: Set state and rerun for existing users ---
-                    st.session_state.user = local_user
-                    st.rerun()
-                    # --- END MODIFICATION ---
-                else:
-                    # New user registration flow
-                    st.subheader("Welcome! Let's set up your organization.")
-                    st.info("Since this is your first time, please create an organization.")
-                    org_name = st.text_input("Enter your organization's name:")
-                    if st.button("Create Organization", use_container_width=True):
-                        if org_name:
-                            new_user = db.create_user_and_organization(user_info, org_name)
-                            st.success(f"Organization '{org_name}' created successfully!")
-                            # --- MODIFICATION: Set state and rerun for new users ---
-                            st.session_state.user = new_user
-                            st.rerun()
-                            # --- END MODIFICATION ---
-                        else:
-                            st.warning("Please enter an organization name.")
-
+    if auth_code:
+        user_info = get_token_from_code(auth_code)
+        st.query_params.clear()
+        if user_info:
+            # Check if user exists in our database
+            local_user = db.get_user_by_email(user_info['email'])
+            if local_user:
+                return local_user # Return existing user from DB
+            return user_info # Return new user info from Auth0
+    
+    # Display login button if not authenticated
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Okta.svg/2560px-Okta.svg.png", width=100)
+    st.subheader("Welcome to Docsplain")
+    st.info("Please sign in or create an account to continue.")
+    if st.button("Login / Sign Up", use_container_width=True, type="primary"):
+        st.session_state.do_auth_redirect = True
+        st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    return None
+
