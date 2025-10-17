@@ -79,16 +79,15 @@ def main():
     load_local_css("style.css")
 
     # Initialize database connection and tables
-    db.init_db()
+    # --- FIX: Changed db.init_db() to the correct function name db.setup_database() ---
+    db.setup_database()
 
-    # --- MODIFICATION: Simplified Auth Check ---
     # The main app now just checks if a user exists in the session.
     # The auth_flow module is responsible for setting this state.
     if "user" not in st.session_state or st.session_state.user is None:
         show_auth_flow()
     else:
         show_main_application()
-    # --- END MODIFICATION ---
 
 if __name__ == "__main__":
     main()
