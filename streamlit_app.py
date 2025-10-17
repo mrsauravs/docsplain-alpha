@@ -6,7 +6,7 @@ import json
 import database as db
 from utils import load_local_css, parse_csv, call_ai, generate_docx
 from kb_wizard import show_kb_wizard
-from auth import handle_auth
+from auth import show_login_button, get_token_from_code
 
 def show_new_user_registration(auth_info):
     """Displays a form for a new user to create an organization."""
@@ -20,9 +20,9 @@ def show_new_user_registration(auth_info):
             with st.spinner("Setting up your account..."):
                 new_user = db.create_user_and_organization(auth_info, org_name)
                 if new_user:
+                    # Set the user and rerun to enter the main app
                     st.session_state.user = new_user
                     st.rerun()
-                # If new_user is None, an error was already displayed by the db function
         else:
             st.warning("Please enter an organization name.")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -84,17 +84,34 @@ def main():
     try:
         db.setup_database()
 
-        if "user" not in st.session_state or st.session_state.user is None:
-            auth_result = handle_auth()
-            if auth_result:
-                # Check if it's a known user (from our DB) or a new user (from Auth0)
-                if 'org_id' in auth_result:
-                    st.session_state.user = auth_result
-                    st.rerun()
-                else: # New user from Auth0, show registration form
-                    show_new_user_registration(auth_result)
-        else:
+        # Check for user in session state first
+        if "user" in st.session_state and st.session_state.user:
             show_main_application()
+            return
+
+        # If no user, check for auth code in URL
+        query_params = st.query_params
+        auth_code = query_params.get("code")
+
+        if auth_code:
+            with st.spinner("Finalizing login..."):
+                auth_info = get_token_from_code(auth_code)
+                st.query_params.clear() # Clean URL after getting code
+
+                if auth_info:
+                    local_user = db.get_user_by_email(auth_info['email'])
+                    if local_user:
+                        st.session_state.user = local_user
+                        st.rerun() # Logged in, show main app
+                    else:
+                        # New user, show registration form
+                        show_new_user_registration(auth_info)
+                else:
+                    st.error("Authentication failed. Please try to log in again.")
+                    show_login_button()
+        else:
+            # No user and no auth code, show the login button
+            show_login_button()
 
     except Exception as e:
         st.error("An unexpected error occurred. Please see the details below.")
