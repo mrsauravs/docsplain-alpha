@@ -6,7 +6,6 @@ import json
 def get_db_connection():
     """Establishes a connection to the PostgreSQL database."""
     try:
-        # This function fetches the DATABASE_URL from Streamlit's secrets manager.
         conn = psycopg2.connect(st.secrets["DATABASE_URL"])
         return conn
     except Exception as e:
@@ -19,14 +18,12 @@ def setup_database():
     if conn:
         try:
             with conn.cursor() as cur:
-                # Create organizations table
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS organizations (
                         id SERIAL PRIMARY KEY,
                         name VARCHAR(255) NOT NULL
                     );
                 """)
-                # Create users table
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id SERIAL PRIMARY KEY,
@@ -36,8 +33,6 @@ def setup_database():
                         picture_url TEXT
                     );
                 """)
-                # Create knowledge_bases table
-                # --- FIX: Completed the SQL statement with a closing parenthesis and quotes ---
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS knowledge_bases (
                         id SERIAL PRIMARY KEY,
@@ -46,7 +41,6 @@ def setup_database():
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
-                # --- END FIX ---
             conn.commit()
         except psycopg2.Error as e:
             st.error(f"Database Schema Error: Could not set up tables. Details: {e}")
@@ -68,7 +62,19 @@ def get_user_by_email(email):
                 user_data = cur.fetchone()
                 if user_data:
                     columns = [desc[0] for desc in cur.description]
-                    return dict(zip(columns, user_data))
+                    db_dict = dict(zip(columns, user_data))
+
+                    # --- FIX: Manually sanitize the dictionary to ensure serializable types ---
+                    sanitized_user = {
+                        "id": int(db_dict["id"]),
+                        "org_id": int(db_dict["org_id"]),
+                        "name": str(db_dict["name"]),
+                        "email": str(db_dict["email"]),
+                        "picture_url": str(db_dict["picture_url"]),
+                        "org_name": str(db_dict["org_name"])
+                    }
+                    return sanitized_user
+                    # --- END FIX ---
         finally:
             conn.close()
     return None
@@ -79,25 +85,21 @@ def create_user_and_organization(user_info, org_name):
     if conn:
         try:
             with conn.cursor() as cur:
-                # Create the organization
                 cur.execute("INSERT INTO organizations (name) VALUES (%s) RETURNING id;", (org_name,))
                 org_id = cur.fetchone()[0]
 
-                # Create the user
                 cur.execute("""
                     INSERT INTO users (org_id, name, email, picture_url)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING id;
+                    VALUES (%s, %s, %s, %s);
                 """, (org_id, user_info.get('name'), user_info.get('email'), user_info.get('picture')))
-                user_id = cur.fetchone()[0]
                 
                 conn.commit()
-                # Return the newly created user's full details
+                # After creating, fetch the sanitized user object
                 return get_user_by_email(user_info.get('email'))
 
         except psycopg2.Error as e:
             st.error(f"Error during user registration: {e}")
-            conn.rollback() # Rollback changes on error
+            conn.rollback()
         finally:
             conn.close()
     return None
@@ -109,13 +111,12 @@ def save_kb_for_organization(org_id, kb_content):
     if conn:
         try:
             with conn.cursor() as cur:
-                # Use INSERT ... ON CONFLICT to either create a new KB or update the existing one
                 cur.execute("""
                     INSERT INTO knowledge_bases (org_id, kb_content)
                     VALUES (%s, %s)
                     ON CONFLICT (org_id) DO UPDATE SET
                         kb_content = EXCLUDED.kb_content;
-                """, (org_id, json.dumps(kb_content))) # Ensure content is a JSON string
+                """, (org_id, json.dumps(kb_content)))
                 conn.commit()
         finally:
             conn.close()
@@ -129,7 +130,8 @@ def get_kb_for_organization(org_id):
                 cur.execute("SELECT kb_content FROM knowledge_bases WHERE org_id = %s;", (org_id,))
                 kb_data = cur.fetchone()
                 if kb_data:
-                    return kb_data[0] # The content is already a dict/JSONB
+                    return kb_data[0]
         finally:
             conn.close()
     return None
+
